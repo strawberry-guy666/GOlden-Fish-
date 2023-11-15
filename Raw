@@ -1,0 +1,50 @@
+import ccxt
+import pandas as pd
+
+# Подключение к бирже Huobi
+huobi = ccxt.huobi({})
+# Получение списка доступных криптовалютных пар на бирже Huobi
+huobi_markets = huobi.fetch_markets()
+all_markets = [market['symbol'] for market in huobi_markets]
+
+# Анализ связок торговых пар на бирже Huobi
+arbitrage_opportunities = []
+
+for i in range(len(all_markets) - 1):
+    for j in range(i + 1, len(all_markets)):
+        pair_1 = all_markets[i]
+        pair_2 = all_markets[j]
+
+        print(f"Checking pairs: {pair_1} - {pair_2}")
+
+        try:
+            ticker_1 = huobi.fetch_ticker(pair_1)
+            ticker_2 = huobi.fetch_ticker(pair_2)
+
+            if ticker_1 is not None and ticker_2 is not None and 'ask' in ticker_1 and 'bid' in ticker_2:
+                # Проверка условия арбитража
+                if ticker_1['ask'] is not None and ticker_2['bid'] is not None and ticker_1['ask'] < ticker_2['bid']:
+                    potential_profit = (ticker_2['bid'] - ticker_1['ask']) / ticker_1['ask'] * 100
+
+                    if potential_profit >= 5:
+                        arbitrage_opportunities.append({
+                            'Pair 1': pair_1,
+                            'Pair 2': pair_2,
+                            'Huobi Ask Price 1': ticker_1['ask'],
+                            'Huobi Bid Price 2': ticker_2['bid'],
+                            'Potential Profit (%)': potential_profit
+                        })
+
+        except ccxt.NetworkError as e:
+            print(f"Skipping pairs due to NetworkError: {e}")
+        except ccxt.BadSymbol as e:
+            print(f"Skipping pairs due to BadSymbol: {e}")
+
+# Указание пути к файлу Excel
+file_path = 'C:/Users/super/Documents/arbitrage_opportunities_updated.xlsx'
+
+# Создание отдельной страницы в Excel файле для каждой возможности арбитража
+with pd.ExcelWriter(file_path) as writer:
+    for index, opportunity in enumerate(arbitrage_opportunities, start=1):
+        df = pd.DataFrame([opportunity])
+        df.to_excel(writer, sheet_name=f'Opportunity_{index}', index=False)
